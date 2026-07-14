@@ -1139,24 +1139,35 @@ function setupGoogleSheets() {
 
 var LABEL_JAM_DEFAULT = ['Jam Ke-1','Jam Ke-2','Jam Ke-3','Jam Ke-4','Jam Ke-5','Jam Ke-6','Jam Ke-7'];
 var cachedGuru = null;
+var _guruLoaded = false;
 var cachedAbsensi = null;
 var cachedLabel = null;
 
 function getGuruList() {
-  if (cachedGuru) return cachedGuru;
+  if (_guruLoaded) return cachedGuru;
+  _guruLoaded = true;
   var data = localStorage.getItem('daftar_guru');
-  if (data) {
-    try { cachedGuru = JSON.parse(data); return cachedGuru; } catch(e) {}
+  if (data !== null) {
+    try {
+      var parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        cachedGuru = parsed;
+        return cachedGuru;
+      }
+    } catch(e) {}
   }
+  // Tidak ada data atau data rusak — pakai default
   localStorage.setItem('daftar_guru', JSON.stringify(GURU_DEFAULT));
   cachedGuru = GURU_DEFAULT.slice();
   return cachedGuru;
 }
 
 function simpanGuruList(list) {
-  cachedGuru = list;
-  localStorage.setItem('daftar_guru', JSON.stringify(list));
-  pushToCloud('daftar_guru', list);
+  var copy = Array.isArray(list) ? list.slice() : [];
+  cachedGuru = copy;
+  _guruLoaded = true;
+  localStorage.setItem('daftar_guru', JSON.stringify(copy));
+  pushToCloud('daftar_guru', copy);
 }
 
 function getLabelJam() {
