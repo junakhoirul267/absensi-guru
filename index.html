@@ -701,18 +701,18 @@
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
         <span id="fb-status" style="font-size:0.8rem;padding:4px 12px;border-radius:20px;background:#f3f4f6;">💾 Database: Lokal (LocalStorage)</span>
         <button class="btn btn-success btn-sm" onclick="pushToCloudNow()" id="btn-push-cloud" style="display:none;">☁️ Sync ke Cloud</button>
-        <button class="btn btn-primary btn-sm" onclick="setupGoogleSheets()">🔧 Set Google Sheets URL</button>
+        <button class="btn btn-primary btn-sm" onclick="setGithubTokenUI()">🔑 Set GitHub Token</button>
       </div>
       <details style="margin-bottom:10px;font-size:0.85rem;">
-        <summary style="cursor:pointer;color:#2563eb;font-weight:600;">ℹ️ Tentang Database Cloud (Google Sheets)</summary>
+        <summary style="cursor:pointer;color:#2563eb;font-weight:600;">ℹ️ Tentang Database Cloud (GitHub)</summary>
         <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-          <p style="margin-bottom:8px;"><strong>☁️ Google Sheets Database</strong></p>
+          <p style="margin-bottom:8px;"><strong>☁️ GitHub Database</strong></p>
           <p style="margin-bottom:8px;">
-            Aplikasi ini menggunakan <strong>Google Sheets + Apps Script</strong> sebagai database cloud.
-            Semua data tersimpan di Google Sheet — semua pengguna melihat data yang SAMA.
+            Data tersimpan di file <strong>database.json</strong> di repository GitHub.
+            Semua pengguna melihat data yang SAMA. Admin bisa set token untuk sync.
           </p>
           <p style="font-size:0.85rem;color:#64748b;">
-            💡 Deploy file Code.gs ke Apps Script untuk mengaktifkan cloud sync.
+            🔑 Admin: masukin GitHub Token di pengaturan agar data bisa di-sync ke cloud.
           </p>
         </div>
       </details>
@@ -950,58 +950,51 @@ var GURU_DEFAULT = [
 ];
 
 // ======================================================================
-// 🗄️ GOOGLE SHEETS — Database via Apps Script Web App
+// 🗄️ GITHUB — Database via GitHub API (database.json di repo)
 // ======================================================================
-// Data otomatis sync ke Google Sheet melalui Apps Script.
-// Jika halaman diserve dari Apps Script, URL auto-detect.
+// Data otomatis sync ke file database.json di repository.
+// Jika halaman diserve dari GitHub Pages, data langsung kebaca.
 // ======================================================================
 
-var GS_API_URL = (function() {
-  var loc = window.location.href;
-  if (loc.indexOf('script.google.com/macros/s/') !== -1)
-    return loc.split('?')[0].split('#')[0];
-  return localStorage.getItem('gs_api_url') || '';
-})();
+// ======================================================================
+// ☁️ CLOUD DATABASE — GitHub API (repo database.json)
+// ======================================================================
+// Data tersimpan di database.json di repository GitHub.
+// Baca: tanpa token (public). Tulis: butuh token GitHub (admin).
+// ======================================================================
+
+var GITHUB_OWNER = 'junakhoirul267';
+var GITHUB_REPO = 'absensi-guru';
+var GITHUB_BRANCH = 'main';
+var GITHUB_FILE = 'database.json';
+var DB_RAW_URL = 'https://raw.githubusercontent.com/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/' + GITHUB_BRANCH + '/' + GITHUB_FILE;
+var DB_API_URL = 'https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/contents/' + GITHUB_FILE;
 
 var dbOnline = false;
 var dbCheckDone = false;
 var dbSyncInterval = null;
 
-function gsFetchJSON(url) {
-  return fetch(url).then(function(r) { return r.json(); });
+function getGHToken() {
+  return localStorage.getItem('github_token') || '';
 }
 
-function gsPost(action, data) {
-  if (!GS_API_URL) return Promise.reject('No API URL');
-  return fetch(GS_API_URL, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({action:action, data:data})
-  }).then(function(r) { return r.json(); });
+function setGHToken(t) {
+  localStorage.setItem('github_token', t);
 }
 
 function initCloudDb() {
   if (dbCheckDone) return;
   dbCheckDone = true;
-  if (!GS_API_URL) {
-    console.log('🏠 GS API belum di-set — gunakan LocalStorage');
-    renderApp();
-    return;
-  }
-  gsFetchJSON(GS_API_URL + '?action=ping')
+  syncFromCloud()
     .then(function() {
       dbOnline = true;
-      console.log('☁️ Google Sheets terhubung!');
       updateDbStatusUI();
-      return syncFromCloud();
-    })
-    .then(function() {
       renderApp();
       if (dbSyncInterval) clearInterval(dbSyncInterval);
       dbSyncInterval = setInterval(function() { if (dbOnline) silentSync(); }, 30000);
     })
     .catch(function(e) {
-      console.log('⚠️ GS tidak merespon, fallback ke LocalStorage:', e.message);
+      console.log('⚠️ Cloud sync gagal, fallback ke LocalStorage:', e.message);
       dbOnline = false;
       updateDbStatusUI();
       renderApp();
@@ -1009,8 +1002,11 @@ function initCloudDb() {
 }
 
 function syncFromCloud() {
-  if (!dbOnline || !GS_API_URL) return Promise.resolve();
-  return gsFetchJSON(GS_API_URL + '?action=get_all')
+  return fetch(DB_RAW_URL + '?t=' + Date.now())
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(data) {
       if (!data) return;
       if (data.daftar_guru && data.daftar_guru.length > 0) {
@@ -1030,19 +1026,18 @@ function syncFromCloud() {
         if (data.pengaturan.header_data) localStorage.setItem('header_data', JSON.stringify(data.pengaturan.header_data));
         if (data.pengaturan.logo_data) localStorage.setItem('logo_data', data.pengaturan.logo_data);
       }
-      // Push data lokal jika cloud kosong
+      // Push lokal jika cloud kosong
       var localGuru = getGuruList();
-      var localAbsensi = getDataAbsensi();
       if (localGuru.length > 0 && (!data.daftar_guru || data.daftar_guru.length === 0)) {
         pushToCloud();
       }
-    })
-    .catch(function(e) { console.log('Sync error:', e); });
+    });
 }
 
 function silentSync() {
-  if (!dbOnline || !GS_API_URL) return;
-  gsFetchJSON(GS_API_URL + '?action=get_all')
+  if (!dbOnline) return;
+  fetch(DB_RAW_URL + '?t=' + Date.now())
+    .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data) return;
       var changed = false;
@@ -1053,11 +1048,6 @@ function silentSync() {
       if (data.data_absensi && data.data_absensi.length > 0) {
         localStorage.setItem('data_absensi', JSON.stringify(data.data_absensi));
         cachedAbsensi = data.data_absensi; changed = true;
-      }
-      if (data.pengaturan) {
-        if (data.pengaturan.label_jam) { localStorage.setItem('label_jam', JSON.stringify(data.pengaturan.label_jam)); cachedLabel = data.pengaturan.label_jam; changed = true; }
-        if (data.pengaturan.header_data) { localStorage.setItem('header_data', JSON.stringify(data.pengaturan.header_data)); changed = true; }
-        if (data.pengaturan.logo_data) { localStorage.setItem('logo_data', data.pengaturan.logo_data); changed = true; }
       }
       if (changed) {
         renderRingkasanHariIni();
@@ -1078,7 +1068,8 @@ function renderApp() {
 }
 
 function pushToCloud(section, data) {
-  if (!dbOnline || !GS_API_URL) return;
+  var token = getGHToken();
+  if (!token) return;
   var payload;
   if (section && data) {
     payload = {};
@@ -1090,16 +1081,40 @@ function pushToCloud(section, data) {
       pengaturan: getPengaturanObj()
     };
   }
-  gsPost('save_all', payload).catch(function(e) { console.log('Push error:', e); });
+  // Ambil SHA file dulu, lalu update
+  fetch(DB_API_URL, {headers: {'Authorization': 'token ' + token}})
+    .then(function(r) { return r.json(); })
+    .then(function(info) {
+      if (!info.sha) throw new Error('No SHA: ' + JSON.stringify(info));
+      var jsonStr = JSON.stringify(payload, null, 2);
+      var encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      return fetch(DB_API_URL, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'token ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'Auto-sync absensi data',
+          content: encoded,
+          sha: info.sha
+        })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (result.commit) console.log('☁️ Sync OK:', result.commit.sha.slice(0,7));
+      else console.log('⚠️ Sync issue:', result);
+    })
+    .catch(function(e) { console.log('Push error:', e); });
 }
 
 function pushToCloudNow() {
   var guru = getGuruList(), absensi = getDataAbsensi(), pengaturan = getPengaturanObj();
-  gsPost('save_all', {daftar_guru:guru, data_absensi:absensi, pengaturan:pengaturan})
-    .then(function() {
-      alert('✅ Semua data berhasil di-push ke Cloud!\nGuru: '+guru.length+'\nAbsensi: '+absensi.length+' entri');
-    })
-    .catch(function(e) { alert('❌ Gagal: '+e.message); });
+  pushToCloud();
+  var token = getGHToken();
+  if (!token) { alert('❌ Masukkan GitHub Token dulu di pengaturan admin!'); return; }
+  alert('✅ Data akan di-sync ke cloud.\nGuru: '+guru.length+'\nAbsensi: '+absensi.length+' entri');
 }
 
 function updateDbStatusUI() {
@@ -1108,28 +1123,23 @@ function updateDbStatusUI() {
   var btnPush = document.getElementById('btn-push-cloud');
   if (!el) return;
   if (dbOnline) {
-    el.textContent = '☁️ Database: Online (Google Sheets)';
+    el.textContent = '☁️ Database: Online (GitHub)';
     el.style.background = '#dcfce7'; el.style.color = '#15803d';
-    if (footer) footer.textContent = '☁️ Data tersimpan di Google Sheets — semua pengguna melihat data yang sama';
+    if (footer) footer.textContent = '☁️ Data tersimpan di GitHub — semua pengguna melihat data yang sama';
     if (btnPush) btnPush.style.display = 'inline-flex';
-  } else if (GS_API_URL) {
-    el.textContent = '☁️ Database: Menghubungkan...';
-    el.style.background = '#fef9c3'; el.style.color = '#a16207';
-    if (btnPush) btnPush.style.display = 'none';
   } else {
-    el.textContent = '💾 Database: Lokal (LocalStorage)';
+    el.textContent = '💾 Database: Lokal (LocalStorage) + Cloud siap';
     el.style.background = '#fef9c3'; el.style.color = '#a16207';
-    if (footer) footer.textContent = '💾 Data disimpan di LocalStorage browser ini saja';
+    if (footer) footer.textContent = '💾 Data lokal — Cloud aktif saat GitHub Token diisi';
     if (btnPush) btnPush.style.display = 'none';
   }
 }
 
-function setupGoogleSheets() {
-  var url = prompt('Masukkan URL Google Apps Script Web App:\n(contoh: https://script.google.com/macros/s/abcdef123/exec)\n\nURL didapat setelah deploy Code.gs ke Apps Script.');
-  if (!url) return;
-  url = url.replace(/\/+$/, '');
-  localStorage.setItem('gs_api_url', url);
-  GS_API_URL = url;
+function setGithubTokenUI() {
+  var token = prompt('Masukkan GitHub Personal Access Token:\n\nCara buat:\n1. Buka github.com/settings/tokens\n2. Generate token dengan scope "repo"\n3. Copy & paste di sini\n\nToken disimpan di browser ini saja.');
+  if (!token || token.trim() === '') return;
+  setGHToken(token.trim());
+  alert('✅ Token tersimpan! Cloud database aktif.');
   location.reload();
 }
 
@@ -2314,7 +2324,7 @@ function importDataJSON(event) {
 
 // ======================================================================
 function initPage() {
-  // Init Cloud DB (Google Sheets) — ini juga render UI setelah sync
+  // Init Cloud DB (GitHub) — ini juga render UI setelah sync
   initCloudDb();
 
   // Init Hijri date picker
@@ -2352,7 +2362,7 @@ function initPage() {
   // Update status database cloud (tunda agar dbOnline sempat di-set)
   setTimeout(function() {
     updateDbStatusUI();
-  }, 800);
+  }, 2000);
 
   // Enter key pada input password admin
   document.getElementById('admin-pass-input').addEventListener('keydown', function(e) {

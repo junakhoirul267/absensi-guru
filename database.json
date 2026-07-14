@@ -1,0 +1,37 @@
+{
+  "daftar_guru": [
+    "Ahmad Fauzi, S.Pd.I",
+    "Nurul Hidayah, S.Pd",
+    "Muhammad Rizki, S.Kom",
+    "Siti Aisyah, S.Ag",
+    "Bambang Supriyadi, S.Pd",
+    "Dewi Sartika, S.Si",
+    "Hasan Basri, S.Pd.I",
+    "Fitriani Lubis, S.Pd",
+    "Rudi Hartono, S.E",
+    "Zainab Harahap, S.Ag",
+    "Abdul Malik, S.Pd",
+    "Rina Marlina, S.Si",
+    "Syahrul Ramadhan, S.Kom",
+    "Mardiah Nasution, S.Pd.I",
+    "Irfan Maulana, S.Pd",
+    "Tuti Alawiyah, S.Ag"
+  ],
+  "data_absensi": [],
+  "pengaturan": {
+    "label_jam": [
+      "Jam Ke-1",
+      "Jam Ke-2",
+      "Jam Ke-3",
+      "Jam Ke-4",
+      "Jam Ke-5",
+      "Jam Ke-6",
+      "Jam Ke-7"
+    ],
+    "admin_password": "Absen Ustadz",
+    "header_data": {
+      "title": "Absen Ustadz",
+      "sub": "Satuan Pendidikan Muadalah Roudlotut Thullab"
+    }
+  }
+}
