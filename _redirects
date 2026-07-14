@@ -1,0 +1,3 @@
+# Redirect for SPA — jika pakai hash routing, ini opsional
+# Semua route fallback ke index (file utama)
+/* /absensi\ Ustadz.html 200
