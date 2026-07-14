@@ -746,7 +746,7 @@
         </ol>
 
         <p><strong>☁️ Data Online:</strong></p>
-        <p>Aplikasi ini menggunakan <strong>Google Sheets + Apps Script</strong> sebagai database cloud
+        <p>Aplikasi ini menggunakan <strong>GitHub database.json</strong> sebagai database cloud
         (gratis, tanpa perlu daftar akun). Semua perubahan data langsung terlihat oleh semua pengguna.
         Data juga tetap aman di LocalStorage browser sebagai cadangan.</p>
       </div>
@@ -1329,18 +1329,14 @@ function resetLogo() {
 }
 
 function simpanConfigCloudflare() {
-  alert('☁️ Database menggunakan Google Sheets + Apps Script.\n' +
-        '1. Buka https://script.google.com, buat project baru\n' +
-        '2. Copy paste isi file Code.gs ke project\n' +
-        '3. Deploy → New Deployment → Web App\n' +
-        '4. Set "Execute as: Me", "Access: Anyone"\n' +
-        '5. Copy URL, paste di menu "Set Google Sheets URL"\n' +
-        'Semua data otomatis tersimpan di cloud!');
+  alert('☁️ Database menggunakan GitHub API + file database.json.\n' +
+        'Data otomatis tersimpan di repository GitHub.\n' +
+        'Semua pengguna melihat data yang sama.\n' +
+        'Admin cukup masukin GitHub Token di pengaturan.');
 }
 
 function hapusConfigCloudflare() {
-  alert('⚠️ Hapus URL Google Sheets di menu "Set Google Sheets URL"\n' +
-        'dengan mengosongkan URL, atau set GS_API_URL = "" di LocalStorage.');
+  alert('⚠️ Hapus GitHub Token dengan mengosongkannya di pengaturan admin.');
 }
 
 // ======================================================================
