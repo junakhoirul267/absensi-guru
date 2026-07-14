@@ -985,6 +985,20 @@ function setGHToken(t) {
 function initCloudDb() {
   if (dbCheckDone) return;
   dbCheckDone = true;
+  // Cek apa ada data di localStorage
+  var hasLocalData = localStorage.getItem('daftar_guru') !== null;
+  if (hasLocalData) {
+    // Data lokal ada — pakai lokal, jangan timpa!
+    dbOnline = true;
+    updateDbStatusUI();
+    renderApp();
+    // Tapi push ke cloud kalau token ada
+    if (getGHToken()) pushToCloud();
+    if (dbSyncInterval) clearInterval(dbSyncInterval);
+    dbSyncInterval = setInterval(function() { if (getGHToken()) pushToCloud(); }, 60000);
+    return;
+  }
+  // Data lokal kosong — coba ambil dari cloud
   syncFromCloud()
     .then(function() {
       dbOnline = true;
@@ -994,7 +1008,7 @@ function initCloudDb() {
       dbSyncInterval = setInterval(function() { if (dbOnline) silentSync(); }, 30000);
     })
     .catch(function(e) {
-      console.log('⚠️ Cloud sync gagal, fallback ke LocalStorage:', e.message);
+      console.log('Cloud sync gagal, fallback ke LocalStorage:', e.message);
       dbOnline = false;
       updateDbStatusUI();
       renderApp();
